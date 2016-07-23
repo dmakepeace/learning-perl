@@ -1,0 +1,74 @@
+#!/usr/bin/perl -w
+# DO NOT MODIFY THIS FILE    Signature: 3769f7971d0628f646db7fdc8c545f63  Branch: release  Version: 4.0.0.513  Date: Thu Jul  1 11:38:24 EDT 2010
+use strict;
+
+use DBI;
+my (@sql,@mail,$index,@address,$max);
+
+## User Configurations
+@address=('tosako@toptech.com');
+$sql[0] = "SELECT count(*) FROM TransInQueue";
+$sql[1] = "SELECT count(*) FROM TransOutQueue where route_cd in ('BOL12','CHEMC')";
+$max=1000;
+
+#get environment data
+my $db_host=$ENV{"DB_HOST"};
+my $db_name=$ENV{"DB_NAME"};
+my $db_pwd=$ENV{"DB_PWD"};
+my $db_user=$ENV{"DB_USER"};
+
+unless($db_host)
+{
+	$db_host="tophat-demo";
+}
+unless($db_name)
+{
+	$db_name="TophatData";
+}
+unless($db_pwd)
+{
+	$db_pwd="toptech";
+}
+unless($db_user)
+{
+	$db_user="tophat";
+}
+
+# Connect to the data source and get a handle for that connection.
+my $dbh = DBI->connect("DBI:mysql:$db_name:$db_host",$db_user,$db_pwd)
+    or die "Can't connect to $db_host: $DBI::errstr";
+
+# Prepare the statement.
+for($index=0;$index<=$#sql;$index++)
+{
+
+	my $sth = $dbh->prepare($sql[$index])
+		 or die "Can't prepare statement: $DBI::errstr";
+
+	# Execute the statement.
+	$sth->execute();
+
+	# Fetch and display the result set value.
+	while ( my @row = $sth->fetchrow_array ) {
+		if($row[0]>$max)
+		{
+			my $table;
+			($table)=($sql[$index]=~/from\s+(\S+)/i);
+			push @mail,"$table: $row[0] queues\n";
+		}
+	}
+}
+
+# Disconnect the database from the database handle.
+$dbh->disconnect;
+
+#send e-mail if there is any
+if($#mail>-1)
+{
+	my $email_address=join(",",@address);
+	open(MAIL,"|/usr/sbin/sendmail -t");
+	print MAIL "TO: $email_address\n";
+	print MAIL "SUBJECT: $db_host\n";
+	print MAIL "@mail";
+	close(MAIL);
+}

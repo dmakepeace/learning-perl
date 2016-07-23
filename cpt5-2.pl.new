@@ -1,0 +1,16 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+sub ruler {
+	my @ruler=(0..9) x 5;
+	shift @ruler;
+	print @ruler, "\n";
+}
+
+print "Enter a list of strings on separate lines:\n";
+chomp (my @list = <STDIN>);
+
+&ruler;
+my $formatter = "%20s\n" x @list;
+printf $formatter, @list; 

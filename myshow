@@ -1,0 +1,108 @@
+#!/usr/bin/perl
+# DO NOT MODIFY THIS FILE    Signature: 9d919b3f3ad2ee600f19c531b9de28ce  Branch: release  Version: 4.0.0.513  Date: Thu Jul  1 11:38:24 EDT 2010
+
+use DBI;
+use Getopt::Std;
+use Text::CSV;
+
+my $csv = Text::CSV->new;
+
+if($#ARGV==-1)
+{
+	die "Missing Filename\n\nInvalid command line argument\nmylist --help for help\n";
+}
+my $table=shift;
+my $mylist=shift;
+unless($mylist)
+{
+	$mylist="mylist";
+}
+#my $line=shift;
+#unless($line)
+#{
+#	$line=<STDIN>;
+#}
+
+#get environment data
+my $db_host=$ENV{"DB_HOST"};
+my $db_name=$ENV{"DB_NAME"};
+my $db_pwd=$ENV{"DB_PWD"};
+my $db_user=$ENV{"DB_USER"};
+print "$db_name\n";
+#mysql init connection
+$dbh=DBI->connect("DBI:mysql:$db_name:$db_host",$db_user,$db_pwd);
+$sth=$dbh->prepare("show tables");
+$sth->execute;
+while($mytable=$sth->fetchrow)
+{
+	$sql_table{$mytable}=1;
+}
+unless($sql_table{$table})
+{
+	die "Tablename, \"$table\",  does not exist\n";
+}
+$fieldname="Fields";
+$size_number="Size";
+$string="Data";
+$~=LIST;
+write;
+$sth=$dbh->prepare("describe $table");
+$sth->execute;
+while(@row=$sth->fetchrow_array)
+{
+	#read number of characters and save into array
+	unless(($num)=($row[1]=~/(\d+)/))
+	{
+		if($row[1] =~ /^datetime/)
+		{
+			$num=19;
+		}
+		elsif($row[1] =~ /^date/)
+		{
+			$num=10;
+		}
+		else
+		{
+			$num=0;
+			$sth1=$dbh->prepare("select field_length from TextFieldLengths where table_name='$table' and field_name='$row[0]'");
+			$sth1->execute;
+			while(@row1=$sth1->fetchrow_array)
+			{
+				$num=$row1[0]
+			}
+			unless($num)
+			{
+				die "Unknown Text Field Lengths for Field name: $row[0] on Table name: $table\n";
+			}
+		}
+	}
+	push @field, $row[0];
+	push @size, $num;
+}
+open(MYLIST,"$mylist $table|");
+while($line=<MYLIST>)
+{
+	if($csv->parse($line))
+	{
+		@flat=$csv->fields;
+		for($index=0;$index<=$#flat;$index++)
+		{
+			$fieldname=$field[$index];
+			$size_number=$size[$index];
+			$string=$flat[$index];
+			write;
+		}
+	}
+	print "#####################################\n";
+	$fieldname="Fields";
+	$size_number="Size";
+	$string="Data";
+	write;
+	
+}
+
+format LIST=
+@<<<<<<<<<<<<<<<<<<<<@<<<<@<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+$fieldname $size_number $string
+.
+
